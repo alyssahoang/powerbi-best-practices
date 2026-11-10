@@ -1,0 +1,42 @@
+/// One row per date and line from your CSV (216 rows in the sample: month x channel x region). Columns are hidden on purpose: visuals use the explicit measures in _Measures and the descriptive columns in Dim_Series and Dim_Date.
+table Fact_Sales
+	lineageTag: 07ba3d54-74ba-4ae5-b8ee-5a81efaecb40
+
+	column Date
+		dataType: dateTime
+		isHidden
+		formatString: dd mmm yyyy
+		lineageTag: af2d12c2-a7a2-4b0f-beb9-4139a3bded61
+		summarizeBy: none
+		sourceColumn: Date
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	column Series
+		dataType: string
+		isHidden
+		lineageTag: 7243e53a-22f0-44da-bc96-a29f40005df0
+		summarizeBy: none
+		sourceColumn: Series
+
+	column Sales
+		dataType: double
+		isHidden
+		formatString: #,0
+		lineageTag: e9170e07-c6c0-42bb-a591-510972325d47
+		summarizeBy: none
+		sourceColumn: Sales
+
+	partition Fact_Sales = m
+		mode: import
+		queryGroup: Facts
+		source =
+				let
+				    Source = Source_Sales,
+				    #"Select Fact Columns" = Table.SelectColumns(Source, {"Month", "Series", "Sales"}),
+				    #"Rename Month To Date" = Table.RenameColumns(#"Select Fact Columns", {{"Month", "Date"}})
+				in
+				    #"Rename Month To Date"
+
+	annotation PBI_ResultType = Table
+

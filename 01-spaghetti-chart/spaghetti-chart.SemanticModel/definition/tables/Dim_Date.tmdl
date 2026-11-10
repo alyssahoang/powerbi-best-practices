@@ -1,0 +1,152 @@
+/// Calculated date table. One row per day from the first to the last date in the fact table, extended to whole years. Weeks start on Monday. Marked as the date table; Auto Date/Time is off.
+table Dim_Date
+	lineageTag: 365ea6ae-c95d-465d-a42d-0e87ef44a160
+	dataCategory: Time
+
+	column Date
+		dataType: dateTime
+		isKey
+		formatString: dd mmm yyyy
+		lineageTag: f0198192-845a-4ea3-af95-9eb504c07a5e
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Date]
+
+	column Year
+		dataType: int64
+		formatString: 0
+		lineageTag: da64a1a3-0eea-4ada-b52b-aa5786bef1c4
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Year]
+
+	column Quarter
+		dataType: string
+		lineageTag: ed3e9704-bc29-4286-aacc-1a5e875c4f5b
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Quarter]
+		sortByColumn: 'Quarter Sort'
+
+	column 'Quarter Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: 70ccbd16-2d4d-44e4-9ed8-2fc66464219a
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Quarter Sort]
+
+	column Month
+		dataType: string
+		lineageTag: 57222cb8-e7c1-49b7-97ad-faf17ac0c0a2
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Month]
+		sortByColumn: 'Month Sort'
+
+	column 'Month Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: 40cff11f-8133-488f-aa22-5d5521a7c409
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Month Sort]
+
+	column 'Month Start'
+		dataType: dateTime
+		formatString: mmm yyyy
+		lineageTag: 9a009304-0703-44a0-9c59-c45a45743a87
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Month Start]
+
+	column 'Week Start'
+		dataType: dateTime
+		formatString: dd mmm yyyy
+		lineageTag: f9e2efdf-f4b2-4b14-9062-1218f5a3f37e
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Week Start]
+
+	column 'Day of Week'
+		dataType: string
+		lineageTag: 94e2460d-cc3f-4fbf-af1c-f8649a1dfeee
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Day of Week]
+		sortByColumn: 'Day of Week Sort'
+
+	column 'Day of Week Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: c289bb38-0d31-4622-a701-674083ae2064
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Day of Week Sort]
+
+	column 'Is Weekend'
+		dataType: boolean
+		lineageTag: 61a1f0d9-009e-485f-8ef7-94cf78d5f49d
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Is Weekend]
+
+	column 'Year Offset'
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: b5ecea40-5fd4-403c-b4cc-afb1a39a41b0
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Year Offset]
+
+	column 'Month Offset'
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: 5aa7daf2-225f-4513-ba77-e6671497c99e
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Month Offset]
+
+	column 'Year Label'
+		dataType: string
+		lineageTag: 6af4da0a-8acd-4083-af53-8c36605ee8c5
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Year Label]
+		sortByColumn: Year
+
+	/// First letter of the month (J F M A M J J A S O N D) for lean axes. Invisible zero-width spaces (0 to 11) keep Jan, Jun and Jul apart; sorted by Month Sort.
+	column 'Month Letter' = LEFT ( FORMAT ( Dim_Date[Date], "mmm" ), 1 ) & REPT ( UNICHAR ( 8203 ), MONTH ( Dim_Date[Date] ) - 1 )
+		dataType: string
+		summarizeBy: none
+		sortByColumn: 'Month Sort'
+
+	partition Dim_Date = calculated
+		mode: import
+		source =
+				VAR MinDate = DATE(YEAR(MIN(Fact_Sales[Date])), 1, 1)
+				VAR MaxDate = DATE(YEAR(MAX(Fact_Sales[Date])), 12, 31)
+				VAR Anchor = MAX(Fact_Sales[Date])
+				RETURN
+				    ADDCOLUMNS(
+				        CALENDAR(MinDate, MaxDate),
+				        "Year", YEAR([Date]),
+				        "Quarter", "Q" & FORMAT([Date], "q"),
+				        "Quarter Sort", YEAR([Date]) * 10 + INT(FORMAT([Date], "q")),
+				        "Month", FORMAT([Date], "mmm"),
+				        "Month Sort", MONTH([Date]),
+				        "Month Start", DATE(YEAR([Date]), MONTH([Date]), 1),
+				        "Week Start", [Date] - WEEKDAY([Date], 2) + 1,
+				        "Day of Week", FORMAT([Date], "ddd"),
+				        "Day of Week Sort", WEEKDAY([Date], 2),
+				        "Is Weekend", WEEKDAY([Date], 2) >= 6,
+				        "Year Offset", YEAR([Date]) - YEAR(Anchor),
+				        "Month Offset", (YEAR([Date]) - YEAR(Anchor)) * 12 + MONTH([Date]) - MONTH(Anchor),
+				        "Year Label", SWITCH(YEAR([Date]) - YEAR(Anchor), 0, "CY", -1, "LY", FORMAT([Date], "yyyy"))
+				    )
+

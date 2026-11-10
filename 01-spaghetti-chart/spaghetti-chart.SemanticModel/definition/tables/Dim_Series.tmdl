@@ -1,0 +1,77 @@
+/// One row per combination of the two groupings (18 in the sample). Series ("Online, North") is both the key and the legend label. Channel Sort and Region Sort follow the Group1Order / Group2Order parameters, then latest-year totals; they also pick each line's colour. Legend Sort orders the legend by the last month's value so it reads in the order the lines end.
+table Dim_Series
+	lineageTag: 7043c2ee-1512-4a7d-88dd-fbfe265bfb51
+
+	column Series
+		dataType: string
+		isKey
+		lineageTag: 0b67d430-e188-44a5-b7ef-06c7df08b69e
+		summarizeBy: none
+		sourceColumn: Series
+		sortByColumn: 'Legend Sort'
+
+	column Channel
+		dataType: string
+		lineageTag: 32017b6a-a24a-4fb1-9fe8-d26ff7e19bb2
+		summarizeBy: none
+		sourceColumn: Channel
+		sortByColumn: 'Channel Sort'
+
+	column Region
+		dataType: string
+		lineageTag: a15112d0-83b4-449a-95b1-0cbc0e8e460f
+		summarizeBy: none
+		sourceColumn: Region
+		sortByColumn: 'Region Sort'
+
+	column 'Channel Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: d79b8879-905c-46d9-a047-0a3ceb7cbd78
+		summarizeBy: none
+		sourceColumn: Channel Sort
+
+	column 'Region Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: c2d68922-a9e3-4d7a-942c-6201189f8cfd
+		summarizeBy: none
+		sourceColumn: Region Sort
+
+	column 'Legend Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: fd1bdf64-d7ba-4d97-88de-6783f0b963b5
+		summarizeBy: none
+		sourceColumn: Legend Sort
+
+	partition Dim_Series = m
+		mode: import
+		queryGroup: Dimensions
+		source =
+				let
+				    Source = Source_Sales,
+				    LatestYear = List.Max(List.Transform(Source[Month], Date.Year)),
+				    LatestRows = Table.SelectRows(Source, each Date.Year([Month]) = LatestYear),
+				    LastMonth = Date.Month(List.Max(LatestRows[Month])),
+				    ChannelOrder = fnGroupOrder(Source, "Channel", Group1Order),
+				    RegionOrder = fnGroupOrder(Source, "Region", Group2Order),
+				    #"Keep Series Columns" = Table.SelectColumns(Source, {"Series", "Channel", "Region"}),
+				    #"Remove Duplicate Series" = Table.Distinct(#"Keep Series Columns"),
+				    #"Add Channel Sort" = Table.AddColumn(#"Remove Duplicate Series", "Channel Sort", each List.PositionOf(ChannelOrder, [Channel]) + 1, Int64.Type),
+				    #"Add Region Sort" = Table.AddColumn(#"Add Channel Sort", "Region Sort", each List.PositionOf(RegionOrder, [Region]) + 1, Int64.Type),
+				    #"Last Month Sales" = Table.Group(Table.SelectRows(LatestRows, each Date.Month([Month]) = LastMonth), {"Series"}, {{"Last Month Sales", each List.Sum([Sales]), type number}}),
+				    #"Rank By Last Month Sales" = Table.AddIndexColumn(Table.Sort(#"Last Month Sales", {{"Last Month Sales", Order.Descending}}), "Legend Rank", 1, 1, Int64.Type),
+				    #"Join Legend Rank" = Table.NestedJoin(#"Add Region Sort", {"Series"}, #"Rank By Last Month Sales", {"Series"}, "Rank", JoinKind.LeftOuter),
+				    #"Expand Legend Rank" = Table.ExpandTableColumn(#"Join Legend Rank", "Rank", {"Legend Rank"}, {"Legend Rank"}),
+				    #"Add Legend Sort" = Table.AddColumn(#"Expand Legend Rank", "Legend Sort", each if [Legend Rank] = null then 1000 + [Channel Sort] * 100 + [Region Sort] else [Legend Rank], Int64.Type),
+				    #"Remove Helper Column" = Table.RemoveColumns(#"Add Legend Sort", {"Legend Rank"}),
+				    #"Sort Rows" = Table.Sort(#"Remove Helper Column", {{"Channel Sort", Order.Ascending}, {"Region Sort", Order.Ascending}})
+				in
+				    #"Sort Rows"
+
+	annotation PBI_ResultType = Table
+

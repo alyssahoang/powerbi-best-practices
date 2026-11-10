@@ -1,0 +1,100 @@
+/// Home for every explicit measure in the model. The single column is hidden so the table shows only measures, organised into display folders: 00 Base, then one folder per question or chart.
+table _Measures
+	lineageTag: fd1556f2-ee7c-40ea-aabf-c69bb0d962d1
+
+	/// Total sales in USD. Plain sum of Fact_Sales[Sales]; every other measure builds on this one.
+	measure Sales = SUM ( Fact_Sales[Sales] )
+		formatString: \$#,0;-\$#,0;\$#,0
+		displayFolder: 00 Base
+		lineageTag: 48542993-8e10-4741-ac75-8aa73bb14799
+
+	/// Line colour for the spaghetti chart: hue by the second grouping's position (Region Sort: 1 blue, 2 orange, 3 green, 4 red, 5 purple, 6 grey, then repeats), shade by the first grouping's position (Channel Sort: 1 dark, 2 mid, 3+ light). Works for any group names. Bound to dataPoint.fill through the Series role.
+	measure 'Before Series Colour' =
+			VAR _HueSlot = SELECTEDVALUE ( Dim_Series[Region Sort] )
+			VAR _ShadeSlot = SELECTEDVALUE ( Dim_Series[Channel Sort] )
+			VAR _Palette =
+			    "#1F4E9C#5B86C9#A9C1E6" & "#B4520A#E08A4C#F2C29C" & "#1F7A55#4FAF84#A6D9C0"
+			        & "#8C2D2D#C9605E#E8ABA9" & "#5B3F99#8D72C4#C9BBE6" & "#3B4350#7A828F#C3C8D0"
+			VAR _Hue = MOD ( _HueSlot - 1, 6 )
+			VAR _Shade = MIN ( _ShadeSlot, 3 ) - 1
+			RETURN
+			    IF ( NOT ISBLANK ( _HueSlot ) && NOT ISBLANK ( _ShadeSlot ), MID ( _Palette, _Hue * 21 + _Shade * 7 + 1, 7 ) )
+		displayFolder: Q1 - Before
+		lineageTag: 9b2d8982-b022-4a15-aeac-4d6dd0c4c299
+
+	/// Value per legend row of the Top N chart: the series' own sales for the TopN rows, and the AVERAGE of every series outside the top N for the "Others" row.
+	measure 'Top N Sales' =
+			VAR _Series = SELECTEDVALUE ( Dim_TopN[Series] )
+			VAR _TopList = FILTER ( ALL ( Dim_TopN[Series] ), Dim_TopN[Series] <> "Others" )
+			VAR _OtherSeries = EXCEPT ( ALL ( Dim_Series[Series] ), _TopList )
+			RETURN
+			    SWITCH (
+			        TRUE (),
+			        ISBLANK ( _Series ), BLANK (),
+			        _Series = "Others", AVERAGEX ( _OtherSeries, [Sales] ),
+			        CALCULATE ( [Sales], TREATAS ( { _Series }, Dim_Series[Series] ) )
+			    )
+		formatString: \$#,0;-\$#,0;\$#,0
+		displayFolder: Q3 - Top N
+		lineageTag: 1c712fbb-e67e-473c-bd33-1ff1a79242ba
+
+	/// Line colour for the Top N chart: each top series keeps its colour from the Before chart; "Others" is neutral grey.
+	measure 'Top N Colour' =
+			VAR _Series = SELECTEDVALUE ( Dim_TopN[Series] )
+			RETURN
+			    IF (
+			        _Series = "Others",
+			        "#8A929E",
+			        CALCULATE ( [Before Series Colour], TREATAS ( { _Series }, Dim_Series[Series] ) )
+			    )
+		displayFolder: Q3 - Top N
+		lineageTag: 7b24f191-a8b8-48cf-a176-27732a88130a
+
+	/// Title of the Top N chart, built from the size of Dim_TopN so it follows the TopN parameter.
+	measure 'Top N Title' = "2  Top " & ( COUNTROWS ( ALL ( Dim_TopN ) ) - 1 ) & " + Others"
+		displayFolder: Q3 - Top N
+		lineageTag: de89814f-f10a-47b3-9e36-e3cc795fd4c5
+
+	/// The series with the highest sales in the current filter context (the latest year on this page). The Highlight chart colours this one line.
+	measure 'Highlight Series' =
+			VAR _Top =
+			    CALCULATETABLE (
+			        TOPN ( 1, VALUES ( Dim_Series[Series] ), [Sales], DESC ),
+			        REMOVEFILTERS ( Dim_Series )
+			    )
+			RETURN
+			    MAXX ( _Top, Dim_Series[Series] )
+		displayFolder: Q4 - Highlight
+		lineageTag: 6fb3730c-9082-4e91-9c40-0c9bf0503622
+
+	/// Line colour for the Highlight chart: brand blue for the highlighted series, light grey for every other line.
+	measure 'Highlight Colour' = IF ( SELECTEDVALUE ( Dim_Series[Series] ) = [Highlight Series], "#2B5BB5", "#D5DAE1" )
+		displayFolder: Q4 - Highlight
+		lineageTag: 4b5d8ab2-623e-483d-b673-8b4d3d4e74d2
+
+	/// Title of the Highlight chart, naming the highlighted series.
+	measure 'Highlight Title' = "3  Highlight one · " & [Highlight Series]
+		displayFolder: Q4 - Highlight
+		lineageTag: 23a3b4b8-2fff-4306-9ecd-9635639121a1
+
+	/// One colour per value of the second grouping (darkest shade of the Before palette), for charts where lines are the second grouping only, such as small multiples by channel.
+	measure 'Region Colour' =
+			VAR _HueSlot = SELECTEDVALUE ( Dim_Series[Region Sort] )
+			VAR _Palette = "#1F4E9C#B4520A#1F7A55#8C2D2D#5B3F99#3B4350"
+			RETURN
+			    IF ( NOT ISBLANK ( _HueSlot ), MID ( _Palette, MOD ( _HueSlot - 1, 6 ) * 7 + 1, 7 ) )
+		displayFolder: Q5 - Small multiples
+		lineageTag: 7b1bb068-701d-40fd-8406-a7c5e301ed26
+
+	column Value
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: 4c471010-5d40-4ca0-a152-31260aadc7ee
+		summarizeBy: none
+		sourceColumn: [Value]
+
+	partition _Measures = calculated
+		mode: import
+		source = ROW("Value", 1)
+

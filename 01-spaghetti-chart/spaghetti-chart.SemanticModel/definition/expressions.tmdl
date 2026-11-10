@@ -1,0 +1,106 @@
+/// Folder that holds your CSV file, ending with a backslash. The only place a path appears in the model.
+expression DataFolder = "C:\powerbi-best-practices\01-spaghetti-chart\data\" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+	lineageTag: 1bd46651-d180-4af7-9c7d-5678cf1046f1
+	queryGroup: Parameters
+
+	annotation PBI_ResultType = Text
+
+/// Staging query, load disabled. Reads your CSV, maps your four columns onto the model's names (Month, Channel, Region, Sales), sets types, drops incomplete rows and adds the combined Series label every table below reuses.
+expression Source_Sales =
+		let
+		    Source = Csv.Document(File.Contents(DataFolder & DataFile), [Delimiter = ",", Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+		    #"Promoted Headers" = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),
+		    #"Map Columns To Model Names" = Table.FromColumns(
+		        {
+		            Table.Column(#"Promoted Headers", DateColumn),
+		            Table.Column(#"Promoted Headers", Group1Column),
+		            Table.Column(#"Promoted Headers", Group2Column),
+		            Table.Column(#"Promoted Headers", ValueColumn)
+		        },
+		        {"Month", "Channel", "Region", "Sales"}
+		    ),
+		    #"Set Data Types" = Table.TransformColumnTypes(#"Map Columns To Model Names", {{"Month", type date}, {"Channel", type text}, {"Region", type text}, {"Sales", type number}}, "en-US"),
+		    #"Trim Group Names" = Table.TransformColumns(#"Set Data Types", {{"Channel", Text.Trim, type text}, {"Region", Text.Trim, type text}}),
+		    #"Remove Incomplete Rows" = Table.SelectRows(#"Trim Group Names", each [Month] <> null and [Channel] <> null and [Channel] <> "" and [Region] <> null and [Region] <> "" and [Sales] <> null),
+		    #"Add Series Label" = Table.AddColumn(#"Remove Incomplete Rows", "Series", each [Channel] & ", " & [Region], type text)
+		in
+		    #"Add Series Label"
+	lineageTag: 29b8bfe3-04e3-4f09-a668-64755652b43b
+	queryGroup: Staging
+
+	annotation PBI_ResultType = Table
+
+/// File name of your CSV inside DataFolder. One row per date and line, with a date column, two grouping columns and a numeric value column.
+expression DataFile = "sales_by_channel_region_2025.csv" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+	lineageTag: c6db5580-d76a-41b8-91a4-f6844815ae77
+	queryGroup: Parameters
+
+	annotation PBI_ResultType = Text
+
+/// Header of the date column in your CSV (any date; months are fine).
+expression DateColumn = "Month" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+	lineageTag: 4e4ebf1e-af34-40e7-937d-c30058c858bf
+	queryGroup: Parameters
+
+	annotation PBI_ResultType = Text
+
+/// Header of the FIRST grouping column (in the sample: Channel). Becomes the model column Channel: line shade, small-multiples panels "by channel".
+expression Group1Column = "Channel" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+	lineageTag: d0b6383a-c324-4182-aca2-624ee7d58741
+	queryGroup: Parameters
+
+	annotation PBI_ResultType = Text
+
+/// Header of the SECOND grouping column (in the sample: Region). Becomes the model column Region: line colour, filter slicer, panels "by region".
+expression Group2Column = "Region" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+	lineageTag: 3e35cdc3-b8dd-4719-b611-59077253e6c7
+	queryGroup: Parameters
+
+	annotation PBI_ResultType = Text
+
+/// Header of the numeric value column in your CSV (in the sample: Sales).
+expression ValueColumn = "Sales" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+	lineageTag: e288c269-ed35-4b8a-a744-8252ff032933
+	queryGroup: Parameters
+
+	annotation PBI_ResultType = Text
+
+/// Optional display order of the first grouping, comma separated. Leave empty to order by latest-year total, largest first. Values you do not list follow, by total.
+expression Group1Order = "Online, In-store, Wholesale" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=false]
+	lineageTag: 28b665f4-188a-4ccf-9d93-139480c4c42e
+	queryGroup: Parameters
+
+	annotation PBI_ResultType = Text
+
+/// Optional display order of the second grouping, comma separated. The order also picks the colour family (1 blue, 2 orange, 3 green, 4 red, 5 purple, 6 grey, then repeats). Leave empty to order by latest-year total.
+expression Group2Order = "North, South, East, West, Central, Int'l" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=false]
+	lineageTag: 4bcb5b66-036f-478e-bdb9-263cc996c35f
+	queryGroup: Parameters
+
+	annotation PBI_ResultType = Text
+
+/// How many lines the "Top N + Others" chart keeps; every other line is averaged into "Others".
+expression TopN = 5 meta [IsParameterQuery=true, Type="Number", IsParameterQueryRequired=true]
+	lineageTag: 01666cbd-35d7-466e-83b4-0e933a21a98c
+	queryGroup: Parameters
+
+	annotation PBI_ResultType = Number
+
+/// Helper function, load disabled. Returns the distinct values of one grouping column in display order: the values listed in an order parameter first, then every other value by latest-year total, largest first.
+expression fnGroupOrder =
+		(rows as table, columnName as text, explicitOrder as nullable text) as list =>
+		let
+		    LatestYear = List.Max(List.Transform(rows[Month], Date.Year)),
+		    LatestRows = Table.SelectRows(rows, each Date.Year([Month]) = LatestYear),
+		    Totals = Table.Group(LatestRows, {columnName}, {{"Total", each List.Sum([Sales]), type number}}),
+		    ByTotal = Table.Column(Table.Sort(Totals, {{"Total", Order.Descending}}), columnName),
+		    AllValues = List.Distinct(Table.Column(rows, columnName)),
+		    Listed = if explicitOrder = null then {} else List.Select(List.Transform(Text.Split(explicitOrder, ","), Text.Trim), each _ <> "" and List.Contains(AllValues, _)),
+		    Ordered = List.Distinct(Listed & ByTotal & AllValues)
+		in
+		    Ordered
+	lineageTag: 58d9a60f-e2b1-446a-a76e-d94c9dd94b3b
+	queryGroup: Staging
+
+	annotation PBI_ResultType = Function
+

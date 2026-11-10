@@ -1,0 +1,117 @@
+{
+  "name": "spaghetti-theme.json",
+  "dataColors": [
+    "#2B5BB5",
+    "#D9752C",
+    "#8A929E",
+    "#1F7A55",
+    "#6B3FB3",
+    "#8C2D2D",
+    "#5B86C9",
+    "#E08A4C"
+  ],
+  "firstLevelElements": "#16191D",
+  "secondLevelElements": "#5B6470",
+  "thirdLevelElements": "#D5DAE1",
+  "fourthLevelElements": "#A3AAB4",
+  "background": "#FFFFFF",
+  "secondaryBackground": "#EDF0F3",
+  "tableAccent": "#2B5BB5",
+  "foreground": "#16191D",
+  "foregroundNeutralSecondary": "#5B6470",
+  "foregroundNeutralTertiary": "#A3AAB4",
+  "backgroundLight": "#EDF0F3",
+  "backgroundNeutral": "#A3AAB4",
+  "good": "#1F7A55",
+  "bad": "#B4520A",
+  "neutral": "#8A929E",
+  "maximum": "#2B5BB5",
+  "center": "#EDF0F3",
+  "minimum": "#D9752C",
+  "textClasses": {
+    "callout": {
+      "fontFace": "Segoe UI Semibold",
+      "fontSize": 24,
+      "color": "#16191D"
+    },
+    "title": {
+      "fontFace": "Segoe UI Semibold",
+      "fontSize": 14,
+      "color": "#16191D"
+    },
+    "header": {
+      "fontFace": "Segoe UI Semibold",
+      "fontSize": 14,
+      "color": "#16191D"
+    },
+    "label": {
+      "fontFace": "Segoe UI",
+      "fontSize": 12,
+      "color": "#5B6470"
+    }
+  },
+  "visualStyles": {
+    "*": {
+      "*": {
+        "background": [
+          {
+            "show": true,
+            "color": {
+              "solid": {
+                "color": "#FFFFFF"
+              }
+            },
+            "transparency": 0
+          }
+        ],
+        "border": [
+          {
+            "show": false
+          }
+        ],
+        "dropShadow": [
+          {
+            "show": false
+          }
+        ],
+        "subTitle": [
+          {
+            "show": false
+          }
+        ]
+      }
+    },
+    "page": {
+      "*": {
+        "background": [
+          {
+            "color": {
+              "solid": {
+                "color": "#F6F7F9"
+              }
+            },
+            "transparency": 0
+          }
+        ],
+        "outspace": [
+          {
+            "color": {
+              "solid": {
+                "color": "#F6F7F9"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "lineChart": {
+      "*": {
+        "lineStyles": [
+          {
+            "lineChartType": "linear"
+          }
+        ]
+      }
+    }
+  }
+}

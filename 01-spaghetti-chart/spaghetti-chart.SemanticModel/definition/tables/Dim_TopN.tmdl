@@ -1,0 +1,39 @@
+/// Legend table for the "Top N + Others" chart: the TopN series with the highest latest-year total, plus one "Others" row. Disconnected on purpose (no relationship); a measure in _Measures decides what each row shows.
+table Dim_TopN
+	lineageTag: 38921806-3e52-4b47-9d42-c9da341fedeb
+
+	column Series
+		dataType: string
+		lineageTag: c00fd2fd-a561-4444-8831-b70c0c7c90f7
+		summarizeBy: none
+		sourceColumn: Series
+		sortByColumn: 'Legend Sort'
+
+	column 'Legend Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: 2d00363d-468d-4ba4-a6b8-c3c9144378d7
+		summarizeBy: none
+		sourceColumn: Legend Sort
+
+	partition Dim_TopN = m
+		mode: import
+		queryGroup: Dimensions
+		source =
+				let
+				    Source = Source_Sales,
+				    LatestYear = List.Max(List.Transform(Source[Month], Date.Year)),
+				    LatestRows = Table.SelectRows(Source, each Date.Year([Month]) = LatestYear),
+				    #"Total By Series" = Table.Group(LatestRows, {"Series"}, {{"Total", each List.Sum([Sales]), type number}}),
+				    #"Sort By Total" = Table.Sort(#"Total By Series", {{"Total", Order.Descending}, {"Series", Order.Ascending}}),
+				    #"Keep Top N" = Table.FirstN(#"Sort By Total", Number.RoundDown(TopN)),
+				    #"Keep Series Column" = Table.SelectColumns(#"Keep Top N", {"Series"}),
+				    #"Add Legend Sort" = Table.AddIndexColumn(#"Keep Series Column", "Legend Sort", 1, 1, Int64.Type),
+				    #"Add Others Row" = Table.InsertRows(#"Add Legend Sort", Table.RowCount(#"Add Legend Sort"), {[Series = "Others", #"Legend Sort" = Table.RowCount(#"Add Legend Sort") + 1]}),
+				    #"Set Data Types" = Table.TransformColumnTypes(#"Add Others Row", {{"Series", type text}, {"Legend Sort", Int64.Type}})
+				in
+				    #"Set Data Types"
+
+	annotation PBI_ResultType = Table
+
